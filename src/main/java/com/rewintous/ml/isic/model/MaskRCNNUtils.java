@@ -23,7 +23,7 @@ public class MaskRCNNUtils {
      * @param featureStride Stride of the feature map relative to the image in pixels.
      * @param anchorStride Stride of anchors on the feature map. For example, if the
      */
-    public static List<FloatBox> generateAnchors(int [] scales, float [] ratios, int width, int height, int featureStride, float anchorStride) {
+    public static List<FloatBox> generateAnchors(float [] scales, float [] ratios, int width, int height, int featureStride, float anchorStride) {
         INDArray scalesArray = Nd4j.create(scales);
         INDArray ratiosArray = Nd4j.create(ratios);
 
@@ -72,7 +72,7 @@ public class MaskRCNNUtils {
         List<FloatBox> allAnchors = new LinkedList<>();
         for (int i = 0; i < scales.length; i++) {
             int scale = scales[i];
-            allAnchors.addAll(generateAnchors(new int[]{scale}, ratios, widths[i], heights[i], featureStrides[i], anchorStride));
+            allAnchors.addAll(generateAnchors(new float[]{scale}, ratios, widths[i], heights[i], featureStrides[i], anchorStride));
         }
         return allAnchors;
     }
@@ -146,6 +146,6 @@ public class MaskRCNNUtils {
     }
 
     public static void main(String[] args) {
-        generateAnchors(new int[]{32}, new float[]{0.5f, 1, 2}, 192, 192, 4, 1);
+        generateAnchors(new float[]{32}, new float[]{0.5f, 1, 2}, 192, 192, 4, 1);
     }
 }

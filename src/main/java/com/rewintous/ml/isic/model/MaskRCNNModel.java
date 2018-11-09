@@ -48,7 +48,7 @@ public class MaskRCNNModel {
         INDArray moldImage = moldImage(resizeImageResult.getResizedImage());
 
         int width = bufferedImage.getWidth();
-        int height = bufferedImage.getWidth();
+        int height = bufferedImage.getHeight();
         int channels = 3;
 
         //Component 1 - metadata
@@ -63,7 +63,7 @@ public class MaskRCNNModel {
         );
 
         //Component 2 - normalized anchors
-        List<FloatBox> floatBoxes = generateAnchors(width, height);
+        List<FloatBox> floatBoxes = generateAnchors((int) shape[1], (int) shape[0]);
 
         /* Tensors and shapes
          * 0 = {Tensor} Tensor("input_image:0", shape=(1, H, W, 3), dtype=float32)
@@ -82,10 +82,10 @@ public class MaskRCNNModel {
             'rpn_bbox']         <class 'tuple'>: (1, 147312, 4)
          */
 
-        float [][][][] inputImage = new float[1][height][width][3];
+        float [][][][] inputImage = new float[1][(int) shape[0]][(int) shape[1]][3];
 
-        for (int h=0;h<height; h++) {
-            for (int w=0;w<width;w++) {
+        for (int h=0;h<shape[0]; h++) {
+            for (int w=0;w<shape[1];w++) {
                 inputImage[0][h][w][0] = (float) moldImage.getDouble(h, w, 0);
                 inputImage[0][h][w][1] = (float) moldImage.getDouble(h, w, 1);
                 inputImage[0][h][w][2] = (float) moldImage.getDouble(h, w, 2);
@@ -128,7 +128,7 @@ public class MaskRCNNModel {
          */
 
         /*
-          fixme
+          fixme 1
           https://github.com/matterport/Mask_RCNN/blob/master/mrcnn/model.py#L1905-L1919
           Exception in thread "main" java.lang.IllegalArgumentException: Incompatible shapes: [1,44,44,256] vs. [1,43,43,256]
 
@@ -141,6 +141,19 @@ public class MaskRCNNModel {
 	at com.rewintous.ml.isic.ApplyToModel.main(ApplyToModel.java:29)
          */
 
+        /**
+         * fixme 2
+         *
+         * Exception in thread "main" java.lang.IllegalArgumentException: Incompatible shapes: [1,32,44,256] vs. [1,32,43,256]
+         * 	 [[Node: fpn_p4add/add = Add[T=DT_FLOAT, _device="/job:localhost/replica:0/task:0/device:CPU:0"](fpn_p5upsampled/ResizeNearestNeighbor, fpn_c4p4/BiasAdd)]]
+         * 	at org.tensorflow.Session.run(Native Method)
+         * 	at org.tensorflow.Session.access$100(Session.java:48)
+         * 	at org.tensorflow.Session$Runner.runHelper(Session.java:298)
+         * 	at org.tensorflow.Session$Runner.run(Session.java:248)
+         * 	at com.rewintous.ml.isic.model.MaskRCNNModel.detect(MaskRCNNModel.java:151)
+         * 	at com.rewintous.ml.isic.ApplyToModel.main(ApplyToModel.java:29)
+         */
+
         List<Tensor<?>> result = sess.runner()
                 .feed("input_image", inputImageTensor)
                 .feed("input_image_meta", metaTensor)
@@ -149,6 +162,12 @@ public class MaskRCNNModel {
                 .fetch("mrcnn_detection/Reshape_1:0")
                 .fetch("mrcnn_mask/Reshape_1:0")
                 .run();
+
+        float[][][] detectionBuffer = new float[1][400][6];
+        float[][][][][] maskBuffer = new float[1][400][28][28][2];
+
+        result.get(0).expect(Float.class).copyTo(detectionBuffer);
+        result.get(1).expect(Float.class).copyTo(maskBuffer);
 
 
         return null;

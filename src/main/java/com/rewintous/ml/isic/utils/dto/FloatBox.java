@@ -41,10 +41,10 @@ public class FloatBox {
     public void normalize(int width, int height) {
         this.x1 /= (float) (width - 1);
         this.y1 /= (float) (height - 1);
-        this.x2 /= (float) (width - 1);
         this.x2 -= 1;
-        this.y2 /= (float) (height - 1);
+        this.x2 /= (float) (width - 1);
         this.y2 -= 1;
+        this.y2 /= (float) (height - 1);
     }
 
     public void denormalize(int width, int height) {

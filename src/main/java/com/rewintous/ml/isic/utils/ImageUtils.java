@@ -77,7 +77,7 @@ public class ImageUtils {
         }
 
         if (minDim != null) {
-            scale = max(1, minDim / min(h, w));
+            scale = max(1, (float)minDim / min(h, w));
         }
 
         if (minScale != null && scale < minScale) {
@@ -95,7 +95,8 @@ public class ImageUtils {
             image = resizeImageWithHint(image, round(w * scale), round(h * scale), BufferedImage.TYPE_INT_RGB);
         }
 
-
+        h = image.getHeight();
+        w = image.getWidth();
         switch (resizeMode) {
             case SQUARE:
                 padding.setTop((maxDim - h) / 2);
