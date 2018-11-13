@@ -38,6 +38,18 @@ public class FloatBox {
         return y2;
     }
 
+    public float getArea() {
+        return getHeight() * getWidth();
+    }
+
+    public float getWidth() {
+        return x2 - x1;
+    }
+
+    public float getHeight() {
+        return y2 - y1;
+    }
+
     public void normalize(int width, int height) {
         this.x1 /= (float) (width - 1);
         this.y1 /= (float) (height - 1);
@@ -56,6 +68,7 @@ public class FloatBox {
         this.y2 += 1;
     }
 
-
-
+    public FloatBox copy() {
+        return new FloatBox(this.x1, this.y1, this.x2, this.y2);
+    }
 }

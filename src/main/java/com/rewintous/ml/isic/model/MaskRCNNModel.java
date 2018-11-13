@@ -10,10 +10,15 @@ import org.tensorflow.Session;
 import org.tensorflow.Tensor;
 import org.tensorflow.Tensors;
 
+import java.awt.*;
+import java.awt.color.ColorSpace;
 import java.awt.image.BufferedImage;
-import java.util.Iterator;
-import java.util.LinkedList;
+import java.awt.image.WritableRaster;
+import java.util.*;
 import java.util.List;
+
+import static java.lang.Math.floor;
+import static java.lang.Math.max;
 
 public class MaskRCNNModel {
     private final MaskRCNNConfig maskRCNNConfig;
@@ -30,7 +35,7 @@ public class MaskRCNNModel {
         return null;
     }
 
-    public DetectionResult detect(Session sess, BufferedImage bufferedImage) {
+    public List<DetectionResult> detect(Session sess, BufferedImage bufferedImage) {
         ResizeImageResult resizeImageResult = ImageUtils.resize_image(bufferedImage,
                 maskRCNNConfig.getImageMinDim(),
                 maskRCNNConfig.getImageMaxDim(),
@@ -54,16 +59,18 @@ public class MaskRCNNModel {
         //Component 1 - metadata
         long[] shape = moldImage.shape();
         int[] activeClassIds = new int[maskRCNNConfig.getNumClasses()]; //zeros
-        float [] meta = MaskRCNNUtils.compose_image_meta(0,
+        int inferencedWidth = (int) shape[0];
+        int inferencedHeight = (int) shape[1];
+        float[] meta = MaskRCNNUtils.compose_image_meta(0,
                 new int[]{height, width, channels},
-                new int[]{(int) shape[0], (int) shape[1], (int) shape[2]},
+                new int[]{inferencedWidth, inferencedHeight, (int) shape[2]},
                 new FloatBox(resizeImageResult.getWindow()),
                 resizeImageResult.getScale(),
                 activeClassIds
         );
 
         //Component 2 - normalized anchors
-        List<FloatBox> floatBoxes = generateAnchors((int) shape[1], (int) shape[0]);
+        List<FloatBox> floatBoxes = generateAnchors(inferencedHeight, inferencedWidth);
 
         /* Tensors and shapes
          * 0 = {Tensor} Tensor("input_image:0", shape=(1, H, W, 3), dtype=float32)
@@ -82,10 +89,10 @@ public class MaskRCNNModel {
             'rpn_bbox']         <class 'tuple'>: (1, 147312, 4)
          */
 
-        float [][][][] inputImage = new float[1][(int) shape[0]][(int) shape[1]][3];
+        float[][][][] inputImage = new float[1][inferencedWidth][inferencedHeight][3];
 
-        for (int h=0;h<shape[0]; h++) {
-            for (int w=0;w<shape[1];w++) {
+        for (int h = 0; h < shape[0]; h++) {
+            for (int w = 0; w < shape[1]; w++) {
                 inputImage[0][h][w][0] = (float) moldImage.getDouble(h, w, 0);
                 inputImage[0][h][w][1] = (float) moldImage.getDouble(h, w, 1);
                 inputImage[0][h][w][2] = (float) moldImage.getDouble(h, w, 2);
@@ -94,7 +101,7 @@ public class MaskRCNNModel {
 
         Tensor<Float> inputImageTensor = Tensors.create(inputImage);
 
-        float [][] inputImageMeta = new float[1][14];
+        float[][] inputImageMeta = new float[1][14];
 
         for (int i = 0; i < meta.length; i++) {
             inputImageMeta[0][i] = meta[i];
@@ -102,7 +109,7 @@ public class MaskRCNNModel {
 
         Tensor<Float> metaTensor = Tensors.create(inputImageMeta);
 
-        float [][][] boxes = new float[1][floatBoxes.size()][4];
+        float[][][] boxes = new float[1][floatBoxes.size()][4];
 
         int boxId = 0;
         for (FloatBox floatBox : floatBoxes) {
@@ -115,50 +122,10 @@ public class MaskRCNNModel {
 
         Tensor<Float> anchorsTensor = Tensors.create(boxes);
 
-
-        /**
-         * outputs = {list} <class 'list'>: [<tf.Tensor 'mrcnn_detection/Reshape_1:0' shape=(1, 400, 6) dtype=float32>, <tf.Tensor 'mrcnn_class/Reshape_1:0' shape=(?, 2000, 2) dtype=float32>, <tf.Tensor 'mrcnn_bbox/Reshape:0' shape=(?, 2000, 2, 4) dtype=float32>, <tf.Tensor 'mrcnn_mask/Reshape_1:0' shape=(?, 400, 28, 28, 2) dtype=float32>, <tf.Tensor 'ROI/packed_2:0' shape=(1, ?, ?) dtype=float32>, <tf.Tensor 'rpn_class/concat:0' shape=(?, ?, 2) dtype=float32>, <tf.Tensor 'rpn_bbox/concat:0' shape=(?, ?, 4) dtype=float32>]
-         *  0 = {Tensor} Tensor("mrcnn_detection/Reshape_1:0", shape=(1, 400, 6), dtype=float32)
-         *  1 = {Tensor} Tensor("mrcnn_class/Reshape_1:0", shape=(?, 2000, 2), dtype=float32)
-         *  2 = {Tensor} Tensor("mrcnn_bbox/Reshape:0", shape=(?, 2000, 2, 4), dtype=float32)
-         *  3 = {Tensor} Tensor("mrcnn_mask/Reshape_1:0", shape=(?, 400, 28, 28, 2), dtype=float32)
-         *  4 = {Tensor} Tensor("ROI/packed_2:0", shape=(1, ?, ?), dtype=float32)
-         *  5 = {Tensor} Tensor("rpn_class/concat:0", shape=(?, ?, 2), dtype=float32)
-         *  6 = {Tensor} Tensor("rpn_bbox/concat:0", shape=(?, ?, 4), dtype=float32)
-         */
-
-        /*
-          fixme 1
-          https://github.com/matterport/Mask_RCNN/blob/master/mrcnn/model.py#L1905-L1919
-          Exception in thread "main" java.lang.IllegalArgumentException: Incompatible shapes: [1,44,44,256] vs. [1,43,43,256]
-
-	 [[Node: fpn_p4add/add = Add[T=DT_FLOAT, _device="/job:localhost/replica:0/task:0/device:CPU:0"](fpn_p5upsampled/ResizeNearestNeighbor, fpn_c4p4/BiasAdd)]]
-	at org.tensorflow.Session.run(Native Method)
-	at org.tensorflow.Session.access$100(Session.java:48)
-	at org.tensorflow.Session$Runner.runHelper(Session.java:298)
-	at org.tensorflow.Session$Runner.run(Session.java:248)
-	at com.rewintous.ml.isic.model.MaskRCNNModel.detect(MaskRCNNModel.java:137)
-	at com.rewintous.ml.isic.ApplyToModel.main(ApplyToModel.java:29)
-         */
-
-        /**
-         * fixme 2
-         *
-         * Exception in thread "main" java.lang.IllegalArgumentException: Incompatible shapes: [1,32,44,256] vs. [1,32,43,256]
-         * 	 [[Node: fpn_p4add/add = Add[T=DT_FLOAT, _device="/job:localhost/replica:0/task:0/device:CPU:0"](fpn_p5upsampled/ResizeNearestNeighbor, fpn_c4p4/BiasAdd)]]
-         * 	at org.tensorflow.Session.run(Native Method)
-         * 	at org.tensorflow.Session.access$100(Session.java:48)
-         * 	at org.tensorflow.Session$Runner.runHelper(Session.java:298)
-         * 	at org.tensorflow.Session$Runner.run(Session.java:248)
-         * 	at com.rewintous.ml.isic.model.MaskRCNNModel.detect(MaskRCNNModel.java:151)
-         * 	at com.rewintous.ml.isic.ApplyToModel.main(ApplyToModel.java:29)
-         */
-
         List<Tensor<?>> result = sess.runner()
                 .feed("input_image", inputImageTensor)
                 .feed("input_image_meta", metaTensor)
                 .feed("input_anchors", anchorsTensor)
-//                .fetch("mrcnn_detection")
                 .fetch("mrcnn_detection/Reshape_1:0")
                 .fetch("mrcnn_mask/Reshape_1:0")
                 .run();
@@ -169,29 +136,31 @@ public class MaskRCNNModel {
         result.get(0).expect(Float.class).copyTo(detectionBuffer);
         result.get(1).expect(Float.class).copyTo(maskBuffer);
 
+        List<DetectionResult> results = unmoldDetections(detectionBuffer[0], maskBuffer[0], width, height, inferencedWidth, inferencedHeight,
+                new FloatBox(resizeImageResult.getWindow()));
 
-        return null;
+        return results;
     }
 
-    INDArray moldImage(BufferedImage bufferedImage) {
+    protected INDArray moldImage(BufferedImage bufferedImage) {
         INDArray indArray = ImageUtils.asMatrix(bufferedImage);
         //todo replace with matrix operations
-        for (int h=0; h<indArray.shape()[0]; h++) {
-            for (int w=0; w<indArray.shape()[1]; w++) {
-                indArray.putScalar(h, w, 0, indArray.getDouble(h,w,0) - maskRCNNConfig.getMeanPixel()[0]);
-                indArray.putScalar(h, w, 1, indArray.getDouble(h,w,1) - maskRCNNConfig.getMeanPixel()[1]);
-                indArray.putScalar(h, w, 2, indArray.getDouble(h,w,2) - maskRCNNConfig.getMeanPixel()[2]);
+        for (int h = 0; h < indArray.shape()[0]; h++) {
+            for (int w = 0; w < indArray.shape()[1]; w++) {
+                indArray.putScalar(h, w, 0, indArray.getDouble(h, w, 0) - maskRCNNConfig.getMeanPixel()[0]);
+                indArray.putScalar(h, w, 1, indArray.getDouble(h, w, 1) - maskRCNNConfig.getMeanPixel()[1]);
+                indArray.putScalar(h, w, 2, indArray.getDouble(h, w, 2) - maskRCNNConfig.getMeanPixel()[2]);
             }
         }
 
         return indArray;
     }
 
-    List<FloatBox> generateAnchors(int width, int height) {
+    private List<FloatBox> generateAnchors(int width, int height) {
         List<ImageShape> shapes = computeBackboneShapes(width, height);
 
-        int [] widths = new int[shapes.size()];
-        int [] heights = new int[shapes.size()];
+        int[] widths = new int[shapes.size()];
+        int[] heights = new int[shapes.size()];
 
         Iterator<ImageShape> iterator = shapes.iterator();
         for (int i = 0; i < widths.length; i++) {
@@ -212,16 +181,131 @@ public class MaskRCNNModel {
         return floatBoxes;
     }
 
-    List<ImageShape> computeBackboneShapes(int width, int height) {
+    private List<ImageShape> computeBackboneShapes(int width, int height) {
         List<ImageShape> shapes = new LinkedList<>();
 
         int[] backboneStrides = maskRCNNConfig.getBackboneStrides();
         for (int i = 0; i < backboneStrides.length; i++) {
             int backboneStride = backboneStrides[i];
-            shapes.add(new ImageShape(width/backboneStride, height/backboneStride));
+            shapes.add(new ImageShape(width / backboneStride, height / backboneStride));
         }
         return shapes;
     }
 
+    /**
+     * @param detectionBuffer [N, (y1, x1, y2, x2, class_id, score)] in normalized coordinates
+     * @param maskBuffer      [N, height, width, num_classes]
+     * @param originalWidth   original image width
+     * @param originalHeight  original image height
+     * @param width           molded image width
+     * @param height          molded image height
+     * @param window          window of molded image on original image
+     * @return Returns:
+     * boxes: [N, (y1, x1, y2, x2)] Bounding boxes in pixels
+     * class_ids: [N] Integer class IDs for each bounding box
+     * scores: [N] Float probability scores of the class_id
+     * masks: [height, width, num_instances] Instance masks
+     */
+    private List<DetectionResult> unmoldDetections(float[][] detectionBuffer, float[][][][] maskBuffer,
+                                                   int originalWidth, int originalHeight, int width, int height, FloatBox window) {
 
+        long numDetections = Arrays.stream(detectionBuffer).filter(buff -> buff[4] > 0).count();
+
+        if (numDetections == 0) {
+            return Collections.emptyList();
+        }
+
+        window.normalize(originalWidth, originalHeight);
+
+        float wh = window.getY2() - window.getY1();
+        float ww = window.getX2() - window.getX1();
+
+        List<DetectionResult> results = new LinkedList<>();
+
+        for (int i = 0; i < numDetections; i++) {
+            float[] detectionArray = detectionBuffer[i];
+            FloatBox floatBox =
+                    new FloatBox(
+                            (detectionArray[1] - window.getX1()) / ww, (detectionArray[0] - -window.getY1()) / wh,
+                            (detectionArray[3] - -window.getX1()) / ww, (detectionArray[2] - -window.getY1()) / wh
+                    );
+            floatBox.denormalize(originalWidth, originalHeight);
+
+            if (floatBox.getArea() <= 0) {
+                continue;
+            }
+
+            int classId = (int) detectionArray[4];
+            float score = detectionArray[5];
+
+            float[][][] detectionMask = maskBuffer[i];
+            //normally (h,w) mask
+            //mask height, width
+
+            int maskHeight = detectionMask.length;
+            int maskWidth = detectionMask[0].length;
+
+            float[][] mask = new float[maskHeight][maskWidth];
+
+            for (int h = 0; h < maskHeight; h++) {
+                for (int w = 0; w < maskWidth; w++) {
+                    mask[h][w] = detectionMask[h][w][classId];
+                }
+            }
+
+            boolean[][] booleanMask = unmold_mask(mask, floatBox, originalWidth, originalHeight);
+            results.add(new DetectionResult(floatBox, classId, score, booleanMask));
+        }
+
+        return results;
+    }
+
+    private boolean[][] unmold_mask(float[][] mask, FloatBox boundaryBox, int imageWidth, int imageHeight) {
+        int width = mask[0].length;
+        int height = mask.length;
+
+        //note resize is done via resizing grayscale image with byte discretization, use numpy.resize or native resize
+        // if needed
+        BufferedImage bufferedImage = new BufferedImage(width, height, BufferedImage.TYPE_BYTE_GRAY);
+        WritableRaster raster = bufferedImage.getRaster();
+
+        for (int h = 0; h < height; h++) {
+            for (int w = 0; w < width; w++) {
+                raster.setPixel(w,h, new int[]{(int)(0xFF * mask[h][w])});
+            }
+        }
+
+        int scaledWidth = (int) boundaryBox.getWidth();
+        int scaledHeight = (int) boundaryBox.getHeight();
+        BufferedImage scaledImage =
+                new BufferedImage(scaledWidth, scaledHeight, BufferedImage.TYPE_BYTE_GRAY);
+
+        Graphics2D g2d = scaledImage.createGraphics();
+        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        g2d.setRenderingHint(RenderingHints.KEY_RENDERING,
+                RenderingHints.VALUE_RENDER_QUALITY);
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                RenderingHints.VALUE_ANTIALIAS_ON);
+
+
+        g2d.drawImage(bufferedImage, 0, 0, scaledWidth, scaledHeight, null);
+        g2d.dispose();
+        WritableRaster scaledRaster = scaledImage.getRaster();
+
+        boolean[][] outMask = new boolean[imageHeight][imageWidth];
+        for (int h = 0; h < imageHeight; h++) {
+            for (int w = 0; w < imageWidth; w++) {
+                int x = (int) floor(w - boundaryBox.getX1());
+                int y = (int) floor(h - boundaryBox.getY1());
+                if (0 <= x && x < scaledWidth && 0 <= y && y < scaledHeight /*&& */) {
+                    if (scaledRaster.getPixel(x, y, (int[])null)[0] > 0x7F) {
+                        outMask[h][w] = true;
+                    }
+                }
+            }
+        }
+
+        return outMask;
+    }
 }

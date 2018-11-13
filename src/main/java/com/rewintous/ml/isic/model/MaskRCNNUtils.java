@@ -6,24 +6,27 @@ import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.ops.transforms.Transforms;
 
+import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class MaskRCNNUtils {
     private MaskRCNNUtils() {
     }
 
     /**
-     * @param scales 1D array of anchor sizes in pixels. Example: [32, 64, 128]
-     * @param ratios 1D array of anchor ratios of width/height. Example: [0.5, 1, 2]
-     * @param width of the feature map over which to generate anchors.
-     * @param height of the feature map over which to generate anchors.
+     * @param scales        1D array of anchor sizes in pixels. Example: [32, 64, 128]
+     * @param ratios        1D array of anchor ratios of width/height. Example: [0.5, 1, 2]
+     * @param width         of the feature map over which to generate anchors.
+     * @param height        of the feature map over which to generate anchors.
      * @param featureStride Stride of the feature map relative to the image in pixels.
-     * @param anchorStride Stride of anchors on the feature map. For example, if the
+     * @param anchorStride  Stride of anchors on the feature map. For example, if the
      */
-    public static List<FloatBox> generateAnchors(float [] scales, float [] ratios, int width, int height, int featureStride, float anchorStride) {
+    public static List<FloatBox> generateAnchors(float[] scales, float[] ratios, int width, int height, int featureStride, float anchorStride) {
         INDArray scalesArray = Nd4j.create(scales);
         INDArray ratiosArray = Nd4j.create(ratios);
 
@@ -49,9 +52,9 @@ public class MaskRCNNUtils {
                     float h = heightWidth[0][i];
                     float w = heightWidth[1][i];
                     boxes.add(new FloatBox((float) (shiftX - 0.5 * w),
-                            (float)(shiftY - 0.5 * h),
-                            (float)(shiftX + 0.5 * w),
-                            (float)(shiftY + 0.5 * h)));
+                            (float) (shiftY - 0.5 * h),
+                            (float) (shiftX + 0.5 * w),
+                            (float) (shiftY + 0.5 * h)));
                 }
             }
         }
@@ -60,13 +63,12 @@ public class MaskRCNNUtils {
     }
 
     /**
-     *
-     * @param scales 1D array of anchor sizes in pixels. Example: [32, 64, 128]
-     * @param ratios 1D array of anchor ratios of width/height. Example: [0.5, 1, 2]
-     * @param widths of the feature map over which to generate anchors.
-     * @param heights of the feature map over which to generate anchors.
+     * @param scales         1D array of anchor sizes in pixels. Example: [32, 64, 128]
+     * @param ratios         1D array of anchor ratios of width/height. Example: [0.5, 1, 2]
+     * @param widths         of the feature map over which to generate anchors.
+     * @param heights        of the feature map over which to generate anchors.
      * @param featureStrides of the feature map relative to the image in pixels.
-     * @param anchorStride Stride of anchors on the feature map. For example, if the
+     * @param anchorStride   Stride of anchors on the feature map. For example, if the
      */
     public static List<FloatBox> generatePyramidAnchors(int[] scales, float[] ratios, int[] widths, int[] heights, int[] featureStrides, float anchorStride) {
         List<FloatBox> allAnchors = new LinkedList<>();
@@ -78,31 +80,32 @@ public class MaskRCNNUtils {
     }
 
     /**
-     *     """Takes attributes of an image and puts them in one 1D array.
+     * """Takes attributes of an image and puts them in one 1D array.
+     * <p>
+     * image_id:
+     * image_shape:
+     * window:
+     * <p>
+     * scale:
+     * active_class_ids:
      *
-     *     image_id:
-     *     image_shape:
-     *     window:
-     *
-     *     scale:
-     *     active_class_ids:
-     * @param image_id An int ID of the image. Useful for debugging.
-     *      *             original_image_shape: [H, W, C] before resizing or padding.
+     * @param image_id             An int ID of the image. Useful for debugging.
+     *                             *             original_image_shape: [H, W, C] before resizing or padding.
      * @param original_image_shape [H, W, C] after resizing and padding
-     * @param image_shape (y1, x1, y2, x2) in pixels. The area of the image where the real
-     * @param window image is (excluding the padding)
-     * @param scale The scaling factor applied to the original image (float32)
-     * @param active_class_ids List of class_ids available in the dataset from which
-     *      *     the image came. Useful if training on images from multiple datasets
-     *      *     where not all classes are present in all datasets.
+     * @param image_shape          (y1, x1, y2, x2) in pixels. The area of the image where the real
+     * @param window               image is (excluding the padding)
+     * @param scale                The scaling factor applied to the original image (float32)
+     * @param active_class_ids     List of class_ids available in the dataset from which
+     *                             *     the image came. Useful if training on images from multiple datasets
+     *                             *     where not all classes are present in all datasets.
      * @return
      */
     public static float[] compose_image_meta(int image_id,
-                                int [] original_image_shape,
-                                int [] image_shape,
-                                FloatBox window,
-                                float scale,
-                                int [] active_class_ids) {
+                                             int[] original_image_shape,
+                                             int[] image_shape,
+                                             FloatBox window,
+                                             float scale,
+                                             int[] active_class_ids) {
         /*
         meta = np.array(
             [image_id] +                  # size=1
@@ -115,15 +118,15 @@ public class MaskRCNNUtils {
          */
         //should be 12 + NUM_CLASSES components including background
         List<Float> singleList = new ArrayList<>();
-        singleList.add((float)image_id);
+        singleList.add((float) image_id);
 
-        singleList.add((float)original_image_shape[0]);
-        singleList.add((float)original_image_shape[1]);
-        singleList.add((float)original_image_shape[2]);
+        singleList.add((float) original_image_shape[0]);
+        singleList.add((float) original_image_shape[1]);
+        singleList.add((float) original_image_shape[2]);
 
-        singleList.add((float)image_shape[0]);
-        singleList.add((float)image_shape[1]);
-        singleList.add((float)image_shape[2]);
+        singleList.add((float) image_shape[0]);
+        singleList.add((float) image_shape[1]);
+        singleList.add((float) image_shape[2]);
 
         singleList.add(window.getY1());
         singleList.add(window.getX1());
@@ -133,7 +136,7 @@ public class MaskRCNNUtils {
         singleList.add(scale);
 
         for (int id : active_class_ids) {
-            singleList.add((float)id);
+            singleList.add((float) id);
         }
 
         float[] output = new float[singleList.size()];
@@ -145,7 +148,60 @@ public class MaskRCNNUtils {
         return output;
     }
 
+    /**
+     * @param boxes  boxes: [N, (y1, x1, y2, x2)] in pixel coordinates
+     * @param width
+     * @param height
+     * @return [N, (y1, x1, y2, x2)] in normalized coordinates
+     */
+    public static List<FloatBox> normBoxes(List<FloatBox> boxes, int width, int height) {
+        return boxes.stream().map(b ->
+        {
+
+            FloatBox r = b.copy();
+            r.normalize(width, height);
+            return r;
+
+        }).collect(Collectors.toList());
+    }
+
+    /**
+     * @param boxes  boxes: [N, (y1, x1, y2, x2)] in pixel coordinates
+     * @param width
+     * @param height
+     * @return [N, (y1, x1, y2, x2)] in int coordinates
+     */
+    public static List<FloatBox> denormBoxes(List<FloatBox> boxes, int width, int height) {
+        return boxes.stream().map(b ->
+        {
+
+            FloatBox r = b.copy();
+            r.denormalize(width, height);
+            return r;
+
+        }).collect(Collectors.toList());
+    }
+
     public static void main(String[] args) {
         generateAnchors(new float[]{32}, new float[]{0.5f, 1, 2}, 192, 192, 4, 1);
+    }
+
+    /**
+     * @param mask [H,W]
+     * @return serializable buffered image
+     */
+    public static BufferedImage maskAsBWImage(boolean[][] mask) {
+        int width = mask[0].length;
+        int height = mask.length;
+        BufferedImage bufferedImage = new BufferedImage(width, height, BufferedImage.TYPE_BYTE_BINARY);
+        for (int h = 0; h < height; h++) {
+            for (int w = 0; w < width; w++) {
+                if (mask[h][w]) {
+                    bufferedImage.setRGB(w, h, Color.WHITE.getRGB());
+                }
+            }
+        }
+
+        return bufferedImage;
     }
 }
