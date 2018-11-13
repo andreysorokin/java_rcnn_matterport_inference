@@ -17,6 +17,29 @@
                     <target>1.8</target>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>1.8</version>
+                <executions>
+                    <execution>
+                        <id>prepare</id>
+                        <phase>validate</phase>
+                        <configuration>
+                            <tasks>
+                                <delete file="src/main/resources/frozen_task_1.pb" quiet="true"/>
+                                <concat destfile="src/main/resources/frozen_task_1.pb" overwrite="true" binary="true">
+                                    <filelist dir="src/main/resources" files="frozen_task_1.pbaa,frozen_task_1.pbab"/>
+                                </concat>
+                                <!--<unzip src="src/main/resources/frozen_task_1.zip.001" dest="src/main/resources" />-->
+                            </tasks>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 
